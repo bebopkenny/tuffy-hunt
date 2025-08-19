@@ -10,13 +10,16 @@ st.markdown(
   """
   <style>
   body, .stApp {
-    background: #000 url('https://upload.wikimedia.org/wikipedia/commons/6/6f/Walking_elephant.gif') repeat 0 0 !important;
-    background-size: 180px auto !important;
+    /* soft white → light orange gradient */
+    background: linear-gradient(135deg, #ffffff 0%, #ffe5b4 100%) fixed !important;
     background-attachment: fixed !important;
-    color: #fff !important;
+    /* switch text to dark for readability */
+    color: #333 !important;
   }
-  h1, h2, h3, h4, h5, h6, p, li, ul, ol, div, a, .markdown-text-container, .stMarkdown, .stText, .stButton, .st-bb, .st-cb, .st-eb, .st-em {
-    color: #fff !important;
+  h1, h2, h3, h4, h5, h6, p, li, ul, ol, div, a,
+  .markdown-text-container, .stMarkdown, .stText,
+  .stButton, .st-bb, .st-cb, .st-eb, .st-em {
+    color: #333 !important;
   }
   .elephant-bg {
     pointer-events: none;
@@ -50,6 +53,7 @@ st.markdown(
   """,
   unsafe_allow_html=True
 )
+
 
 # 2. Top orange banner with images on the left using Streamlit columns
 
