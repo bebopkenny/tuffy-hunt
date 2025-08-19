@@ -181,6 +181,44 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Handle scan links in the game
+
+def handle_scan_from_query():
+  """
+  If the page has team / station / scan=1 in the query string,
+  try to advance and show a toast, then clear the params.
+  """
+  try:
+      params = st.query_params
+  except Exception:
+      params = st.experimental_get_query_params()  # older versions
+
+  def first(v):
+      if isinstance(v, list):
+          return v[0] if v else None
+      return v
+
+  team = first(params.get("team"))
+  station = first(params.get("station"))
+  scan = first(params.get("scan"))
+
+  if team and station and str(scan) == "1":
+      ok, msg = advance_if_expected(team, station)
+      if ok:
+          st.success(msg)
+      else:
+          st.error(msg)
+
+      # Clear query params so refresh doesn’t re-trigger the scan
+      try:
+          st.query_params.clear()
+      except Exception:
+          st.experimental_set_query_params()
+
+st.header("Game")
+handle_scan_from_query() 
+
+
 # Game helpers 
 
 def get_team_by_slug(slug: str) -> Optional[dict]:
@@ -302,12 +340,17 @@ with col1:
                                 st.error(msg)
                         else:
                             st.warning("No alternate station to simulate a wrong scan.")
-                    # Reset button function
-                    if st.button("↩️ Reset this team to start"):
-                      team = get_team_by_slug(team_slug.strip())
-                      if team:
-                          supabase.table("paths").update({"current_index": 0}).eq("team_id", team["id"]).execute()
-                          st.success("Reset to the first station.")
-                          st.rerun()
+        # Reset button function
+        if st.button("↩️ Reset this team to start"):
+          team = get_team_by_slug(team_slug.strip())
+          if team:
+              supabase.table("paths").update({"current_index": 0}).eq("team_id", team["id"]).execute()
+              st.success("Reset to the first station.")
+              st.rerun()
+        # TESTING for expected station ID
+        with st.expander("Debug: expected station id"):
+          if team and next_station is not None:
+              st.write("Expected ID:", expected_id)
+              st.write("Station name:", next_station["name"])      
     else:
         st.warning("Enter your team slug to begin.")
