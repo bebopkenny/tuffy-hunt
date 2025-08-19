@@ -2,9 +2,15 @@ import streamlit as st
 import base64
 from db import supabase
 from typing import Optional, Tuple
+import random
 
 # 1. Page config
 st.set_page_config(page_title="Tuffy Hunt", layout="wide")
+
+# If realtime event landed return quickly to refresh the leaderboard
+if st.session_state.get("_lb_bump") is not None:
+    st.session_state["_lb_bump"] = None
+    st.rerun()
 
 # Animated gradient background and floating elephants
 st.markdown(
@@ -184,8 +190,11 @@ st.markdown(
 # Game helpers 
 
 def get_team_by_slug(slug: str) -> Optional[dict]:
-    res = supabase.table("teams").select("id, name, slug, game_id").eq("slug", slug).single().execute()
+    res = supabase.table("teams")\
+        .select("id, name, slug, game_id, won_at")\
+        .eq("slug", slug).single().execute()
     return res.data
+
 
 def get_path(team_id: str) -> Optional[dict]:
     res = supabase.table("paths").select("station_order, current_index").eq("team_id", team_id).single().execute()
@@ -214,42 +223,75 @@ def get_next_station(team_slug: str) -> Tuple[Optional[dict], Optional[dict], Op
 def advance_if_expected(team_slug: str, scanned_station_id: str) -> Tuple[bool, str]:
     """
     Advance path.current_index by 1 only if scanned_station_id == expected.
-    Returns ok message
+    Returns (ok, message).
     """
     team = get_team_by_slug(team_slug)
     if not team:
-        return False, "Team not found"
+        return False, "Team not found."
     path = get_path(team["id"])
     if not path:
-        return False, "Path not found"
+        return False, "Path not found."
 
     order, idx = path["station_order"], path["current_index"]
     if idx is None or idx >= len(order):
-        return False, "Already finished"
+        return False, "Already finished!"
 
     expected_id = order[idx]
     if scanned_station_id != expected_id:
-        return False, "Not your elephant"
+        return False, "Not your elephant."
 
-    # advance pointer
+    # 1. advance pointer
     new_idx = idx + 1
     supabase.table("paths").update({"current_index": new_idx}).eq(
         "team_id", team["id"]
     ).execute()
 
-    # 👇 add the score event here
+    # 2. award points for the station
     try:
         supabase.table("score_events").insert({
             "team_id": team["id"],
-            "station_id": expected_id,   # the one they just completed
+            "station_id": expected_id,
             "points": 10
         }).execute()
     except Exception as e:
-        # Supabase will throw if they already have a row for this team+station (due to unique index).
-        # That’s okay—it means no double awarding.
+        # duplicate means they already got these points
         print("Score insert skipped:", e)
 
+    # 3. if they just finished the last station, mark winner timestamp for this team
+    finished = new_idx >= len(order)
+
+    if finished and not team.get("won_at"):
+        # Try to set won_at for THIS team if it's still null.
+        # Note: this does not globally prevent others from setting won_at later.
+        # For a strict "first team only" lock, move this to a SQL function or game table.
+        try:
+            supabase.table("teams").update({"won_at": "now()"}).eq("id", team["id"]).execute()
+        except Exception as e:
+            print("Setting won_at failed:", e)
+
+    # Message
+    if finished:
+        return True, "Nice find! (+10) You finished the route."
+
     return True, "Nice find! (+10)"
+
+
+# supabase realtime channel
+if "lb_channel" not in st.session_state:
+    def _on_score_insert(payload):
+        # bump a session var so Streamlit reruns on next tick
+        st.session_state["_lb_bump"] = random.random()
+
+    st.session_state["lb_channel"] = (
+        supabase
+        .channel("scores_live")
+        .on("postgres_changes",
+            event="INSERT",
+            schema="public",
+            table="score_events",
+            callback=_on_score_insert)
+        .subscribe()
+    )
 
 # Handle scan links in the game
 
@@ -302,15 +344,13 @@ RIDDLES = {
 }
 
 st.markdown("<hr>", unsafe_allow_html=True)
-st.header("Game")
 
-# Left column: play area; Right column: (future) leaderboard
+# Left column: play area; Right column: leaderboard
+# Left column: play area; Right column: leaderboard
 col1, col2 = st.columns([2, 1])
 
 with col1:
     st.subheader("Team Console")
-
-    # Team slug input (default to your seeded team from Step 1)
     team_slug = st.text_input("Team slug", value="red-1234")
 
     if team_slug.strip():
@@ -321,22 +361,22 @@ with col1:
         else:
             st.markdown(f"**Team:** {team['name']}  \n**Step:** {0 if idx is None else idx}")
 
-            if next_station is None:
+            # guard: path or order may be missing
+            path = get_path(team["id"])
+            order = (path or {}).get("station_order") or []
+
+            if not order or idx is None or idx >= len(order):
                 st.success("Finished! 🎉")
             else:
-                st.info(f"**Riddle:** {RIDDLES.get(next_station['name'], 'No riddle set yet.')}")
-
-                # Fetch station_order so we can simulate good/wrong scans
-                path = get_path(team["id"])
-                order = path["station_order"]
-
+                # safe to use idx now
                 expected_id = order[idx]
+
+                # In case next_station ever comes back None
+                station_name = next_station['name'] if next_station else 'Unknown'
+                st.info(f"**Riddle:** {RIDDLES.get(station_name, 'No riddle set yet.')}")
+
                 # pick a wrong id if available
-                wrong_id = None
-                for sid in order:
-                    if sid != expected_id:
-                        wrong_id = sid
-                        break
+                wrong_id = next((sid for sid in order if sid != expected_id), None)
 
                 c1, c2 = st.columns(2)
                 with c1:
@@ -344,7 +384,7 @@ with col1:
                         ok, msg = advance_if_expected(team_slug, expected_id)
                         if ok:
                             st.success(msg)
-                            st.rerun()  # refresh to show the next riddle
+                            st.rerun()
                         else:
                             st.error(msg)
 
@@ -353,24 +393,39 @@ with col1:
                         if wrong_id:
                             ok, msg = advance_if_expected(team_slug, wrong_id)
                             if ok:
-                                # should never happen (we chose a wrong_id)
                                 st.warning("Unexpectedly advanced with a wrong id.")
                                 st.rerun()
                             else:
                                 st.error(msg)
                         else:
                             st.warning("No alternate station to simulate a wrong scan.")
-        # Reset button function
-        if st.button("↩️ Reset this team to start"):
-          team = get_team_by_slug(team_slug.strip())
-          if team:
-              supabase.table("paths").update({"current_index": 0}).eq("team_id", team["id"]).execute()
-              st.success("Reset to the first station.")
-              st.rerun()
-        # TESTING for expected station ID
-        with st.expander("Debug: expected station id"):
-          if team and next_station is not None:
-              st.write("Expected ID:", expected_id)
-              st.write("Station name:", next_station["name"])      
+
+            # Reset to start (dev convenience)
+            if st.button("↩️ Reset this team to start"):
+                t = get_team_by_slug(team_slug.strip())
+                if t:
+                    supabase.table("paths").update({"current_index": 0}).eq("team_id", t["id"]).execute()
+                    # During development only, you may also clear winner:
+                    # supabase.table("teams").update({"won_at": None}).eq("id", t["id"]).execute()
+                    st.success("Reset to the first station.")
+                    st.rerun()
+
+            # Debug panel
+            with st.expander("Debug: expected station id"):
+                if team and next_station is not None and idx is not None and idx < len(order):
+                    st.write("Expected ID:", expected_id)
+                    st.write("Station name:", next_station["name"])
     else:
         st.warning("Enter your team slug to begin.")
+
+with col2:
+    st.subheader("Leaderboard")
+    try:
+        rows = supabase.rpc("get_leaderboard").execute().data
+        if rows:
+            for r in rows:
+                st.write(f"#{r['rank']}  {r['team_name']}: {r['points']} pts")
+        else:
+            st.write("No scores yet.")
+    except Exception as e:
+        st.error(f"Could not load leaderboard. {e}")
