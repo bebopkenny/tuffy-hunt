@@ -181,44 +181,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Handle scan links in the game
-
-def handle_scan_from_query():
-  """
-  If the page has team / station / scan=1 in the query string,
-  try to advance and show a toast, then clear the params.
-  """
-  try:
-      params = st.query_params
-  except Exception:
-      params = st.experimental_get_query_params()  # older versions
-
-  def first(v):
-      if isinstance(v, list):
-          return v[0] if v else None
-      return v
-
-  team = first(params.get("team"))
-  station = first(params.get("station"))
-  scan = first(params.get("scan"))
-
-  if team and station and str(scan) == "1":
-      ok, msg = advance_if_expected(team, station)
-      if ok:
-          st.success(msg)
-      else:
-          st.error(msg)
-
-      # Clear query params so refresh doesn’t re-trigger the scan
-      try:
-          st.query_params.clear()
-      except Exception:
-          st.experimental_set_query_params()
-
-st.header("Game")
-handle_scan_from_query() 
-
-
 # Game helpers 
 
 def get_team_by_slug(slug: str) -> Optional[dict]:
@@ -252,29 +214,87 @@ def get_next_station(team_slug: str) -> Tuple[Optional[dict], Optional[dict], Op
 def advance_if_expected(team_slug: str, scanned_station_id: str) -> Tuple[bool, str]:
     """
     Advance path.current_index by 1 only if scanned_station_id == expected.
-    Returns (ok, message).
+    Returns ok message
     """
     team = get_team_by_slug(team_slug)
     if not team:
-        return False, "Team not found."
+        return False, "Team not found"
     path = get_path(team["id"])
     if not path:
-        return False, "Path not found."
+        return False, "Path not found"
 
     order, idx = path["station_order"], path["current_index"]
     if idx is None or idx >= len(order):
-        return False, "Already finished!"
+        return False, "Already finished"
 
     expected_id = order[idx]
     if scanned_station_id != expected_id:
-        return False, "Not your elephant."
+        return False, "Not your elephant"
 
     # advance pointer
     new_idx = idx + 1
-    supabase.table("paths").update({"current_index": new_idx}).eq("team_id", team["id"]).execute()
+    supabase.table("paths").update({"current_index": new_idx}).eq(
+        "team_id", team["id"]
+    ).execute()
 
-    # (optional) add +10 points later via score_events
+    # 👇 add the score event here
+    try:
+        supabase.table("score_events").insert({
+            "team_id": team["id"],
+            "station_id": expected_id,   # the one they just completed
+            "points": 10
+        }).execute()
+    except Exception as e:
+        # Supabase will throw if they already have a row for this team+station (due to unique index).
+        # That’s okay—it means no double awarding.
+        print("Score insert skipped:", e)
+
     return True, "Nice find! (+10)"
+
+# Handle scan links in the game
+
+def handle_scan_from_query():
+    """
+    If the page has team / station / scan=1 in the query string,
+    try to advance and show a toast, then clear the params.
+    """
+    # Read query params with a backward compatible path
+    try:
+        params = st.query_params
+    except Exception:
+        params = st.experimental_get_query_params()  # older versions return dict of lists
+
+    def first(v):
+        if isinstance(v, list):
+            return v[0] if v else None
+        return v
+
+    team = first(params.get("team"))
+    station = first(params.get("station"))
+    scan = first(params.get("scan"))
+
+    # Nothing to do unless all three are present and scan=1
+    if not (team and station and str(scan) == "1"):
+        return
+
+    ok, msg = advance_if_expected(team, station)
+    if ok:
+        st.success(msg)
+    else:
+        st.error(msg)
+
+    # Clear query params so refresh does not trigger the scan
+    try:
+        st.query_params.clear()
+    except Exception:
+        st.experimental_set_query_params()
+
+    st.rerun()   # restart the script without the old query string
+    return
+
+handle_scan_from_query()
+st.header("Game")
+
 
 RIDDLES = {
     "Library":   "Rows of friends with spines of ink; find the place where ideas link.",
