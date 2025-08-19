@@ -1,5 +1,7 @@
 import streamlit as st
 import base64
+from db import supabase
+from typing import Optional, Tuple
 
 # 1. Page config
 st.set_page_config(page_title="Tuffy Hunt", layout="wide")
@@ -178,3 +180,134 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# Game helpers 
+
+def get_team_by_slug(slug: str) -> Optional[dict]:
+    res = supabase.table("teams").select("id, name, slug, game_id").eq("slug", slug).single().execute()
+    return res.data
+
+def get_path(team_id: str) -> Optional[dict]:
+    res = supabase.table("paths").select("station_order, current_index").eq("team_id", team_id).single().execute()
+    return res.data
+
+def get_station(station_id: str) -> Optional[dict]:
+    res = supabase.table("stations").select("id, name").eq("id", station_id).single().execute()
+    return res.data
+
+def get_next_station(team_slug: str) -> Tuple[Optional[dict], Optional[dict], Optional[int]]:
+    """
+    Returns (team, next_station, idx). If finished, next_station is None.
+    """
+    team = get_team_by_slug(team_slug)
+    if not team:
+        return None, None, None
+    path = get_path(team["id"])
+    if not path:
+        return team, None, None
+    order, idx = path["station_order"], path["current_index"]
+    if idx is None or idx >= len(order):
+        return team, None, idx
+    stn = get_station(order[idx])
+    return team, stn, idx
+
+def advance_if_expected(team_slug: str, scanned_station_id: str) -> Tuple[bool, str]:
+    """
+    Advance path.current_index by 1 only if scanned_station_id == expected.
+    Returns (ok, message).
+    """
+    team = get_team_by_slug(team_slug)
+    if not team:
+        return False, "Team not found."
+    path = get_path(team["id"])
+    if not path:
+        return False, "Path not found."
+
+    order, idx = path["station_order"], path["current_index"]
+    if idx is None or idx >= len(order):
+        return False, "Already finished!"
+
+    expected_id = order[idx]
+    if scanned_station_id != expected_id:
+        return False, "Not your elephant."
+
+    # advance pointer
+    new_idx = idx + 1
+    supabase.table("paths").update({"current_index": new_idx}).eq("team_id", team["id"]).execute()
+
+    # (optional) add +10 points later via score_events
+    return True, "Nice find! (+10)"
+
+RIDDLES = {
+    "Library":   "Rows of friends with spines of ink; find the place where ideas link.",
+    "Cafeteria": "Clatter and chatter at midday’s peak; hunger ends where trays you seek.",
+}
+
+st.markdown("<hr>", unsafe_allow_html=True)
+st.header("Game")
+
+# Left column: play area; Right column: (future) leaderboard
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.subheader("Team Console")
+
+    # Team slug input (default to your seeded team from Step 1)
+    team_slug = st.text_input("Team slug", value="red-1234")
+
+    if team_slug.strip():
+        team, next_station, idx = get_next_station(team_slug.strip())
+
+        if not team:
+            st.error("Team not found.")
+        else:
+            st.markdown(f"**Team:** {team['name']}  \n**Step:** {0 if idx is None else idx}")
+
+            if next_station is None:
+                st.success("Finished! 🎉")
+            else:
+                st.info(f"**Riddle:** {RIDDLES.get(next_station['name'], 'No riddle set yet.')}")
+
+                # Fetch station_order so we can simulate good/wrong scans
+                path = get_path(team["id"])
+                order = path["station_order"]
+
+                expected_id = order[idx]
+                # pick a wrong id if available
+                wrong_id = None
+                for sid in order:
+                    if sid != expected_id:
+                        wrong_id = sid
+                        break
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("📷 Scan (simulate correct)"):
+                        ok, msg = advance_if_expected(team_slug, expected_id)
+                        if ok:
+                            st.success(msg)
+                            st.rerun()  # refresh to show the next riddle
+                        else:
+                            st.error(msg)
+
+                with c2:
+                    if st.button("📵 Scan (simulate wrong)"):
+                        if wrong_id:
+                            ok, msg = advance_if_expected(team_slug, wrong_id)
+                            if ok:
+                                # should never happen (we chose a wrong_id)
+                                st.warning("Unexpectedly advanced with a wrong id.")
+                                st.rerun()
+                            else:
+                                st.error(msg)
+                        else:
+                            st.warning("No alternate station to simulate a wrong scan.")
+                    # Reset button function
+                    if st.button("↩️ Reset this team to start"):
+                      team = get_team_by_slug(team_slug.strip())
+                      if team:
+                          supabase.table("paths").update({"current_index": 0}).eq("team_id", team["id"]).execute()
+                          st.success("Reset to the first station.")
+                          st.rerun()
+    else:
+        st.warning("Enter your team slug to begin.")
