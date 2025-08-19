@@ -1,4 +1,3 @@
-
 import streamlit as st
 import base64
 
@@ -169,7 +168,8 @@ st.markdown(
   """,
   unsafe_allow_html=True
 )
-# 5. Simulated bottom orange banner (footer) with centered copyright text
+
+# Simulated bottom orange banner (footer) with centered copyright text
 st.markdown(
     """
     <div style='width:100vw; position:fixed; left:50%; right:50%; bottom:0; margin-left:-50vw; margin-right:-50vw; background-color:#FF7900; height:48px; z-index:1000; display:flex; align-items:center; justify-content:center;'>
