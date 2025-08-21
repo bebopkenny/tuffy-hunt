@@ -613,8 +613,10 @@ with col2:
     try:
         rows = supabase.rpc("get_leaderboard").execute().data
         if rows:
+            medals = {1: '🥇', 2: '🥈', 3: '🥉'}
             for r in rows:
-                st.write(f"#{r['rank']}  {r['team_name']}: {r['points']} pts")
+                medal = medals.get(r['rank'], '')
+                st.markdown(f"{medal} #{r['rank']}  <b>{r['team_name']}</b>: <b>{r['points']} pts</b>", unsafe_allow_html=True)
         else:
             st.write("No scores yet.")
     except Exception as e:
