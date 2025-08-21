@@ -4,10 +4,34 @@ from db import supabase
 from typing import Optional, Tuple
 import random
 from llm import ask_grok, guardian_reply
+import time
 
 
 # 1. Page config
 st.set_page_config(page_title="Tuffy Hunt", layout="wide")
+
+# Override Streamlit's primary color to orange and hide 'Press Enter to apply'
+st.markdown('''
+<style>
+:root {
+    --primary-color: #FF7900 !important;
+    --primary: #FF7900 !important;
+    --accent: #FF7900 !important;
+    --secondary-background-color: #ffe5b4 !important;
+}
+.st-bb, .st-cb, .st-eb, .st-em, .stTextInput > div > div > input:focus, .stTextInput > div > div > input:active {
+    border-color: #FF7900 !important;
+    box-shadow: 0 0 0 2px #FF790022 !important;
+}
+/* Hide 'Press Enter to apply' helper text for all Streamlit text inputs */
+div[data-testid="stTextInput"] span:has(svg) + div span,
+div[data-testid="stTextInput"] > div > div > span,
+div[data-testid="stTextInput"] label + div span,
+div[data-testid="stTextInput"] > div > span {
+    display: none !important;
+}
+</style>
+''', unsafe_allow_html=True)
 
 # If realtime event landed return quickly to refresh the leaderboard
 if st.session_state.get("_lb_bump") is not None:
@@ -106,6 +130,7 @@ st.markdown(f"""
 <div class="banner-spacer"></div>
 """, unsafe_allow_html=True)
 
+
 # 3. Main content (responsive)
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
@@ -118,60 +143,36 @@ st.markdown(
 )
 st.markdown("<h2 style='text-align:center;'>Instructions</h2>", unsafe_allow_html=True)
 st.markdown(
-    """
-    <ul style='margin: 20px auto; max-width: 600px; font-size: 1.1rem; line-height: 1.5;'>
-      <li>Read the guardian bot’s current riddle for your next station.</li>
-      <li>Discuss with your teammates and, if needed, ask the bot for one stronger hint per turn.</li>
-      <li>Tap <b>Scan</b> and scan the QR code on an elephant.</li>
-      <li>If it’s the correct elephant:
-        <ul>
-          <li>You’ll see “Nice find!”</li>
-          <li>You earn 10 points</li>
-          <li>The next riddle appears automatically</li>
-        </ul>
-      </li>
-      <li>If it’s the wrong elephant:
-        <ul>
-          <li>You’ll see “Not your elephant.”</li>
-          <li>Try again—only the next station in your sequence counts</li>
-        </ul>
-      </li>
-      <li>Repeat scanning in order until you reach the shared final elephant.</li>
-      <li>The first team to scan the final duck wins, but all teams can finish at their own pace.</li>
-      <li>Keep an eye on the live leaderboard to track your progress and standings.</li>
-    </ul>
-    """,
-    unsafe_allow_html=True
+        """
+        <div style='background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); border: 1px solid #eee; padding: 28px 32px 24px 32px; margin: 20px auto 32px auto; max-width: 650px;'>
+            <ul style='margin: 0; font-size: 1.1rem; line-height: 1.5;'>
+                <li>Read the guardian bot’s current riddle for your next station.</li>
+                <li>Discuss with your teammates and, if needed, ask the bot for one stronger hint per turn.</li>
+                <li>Tap <b>Scan</b> and scan the QR code on an elephant.</li>
+                <li>If it’s the correct elephant:
+                    <ul>
+                        <li>You’ll see “Nice find!”</li>
+                        <li>You earn 10 points</li>
+                        <li>The next riddle appears automatically</li>
+                    </ul>
+                </li>
+                <li>If it’s the wrong elephant:
+                    <ul>
+                        <li>You’ll see “Not your elephant.”</li>
+                        <li>Try again—only the next station in your sequence counts</li>
+                    </ul>
+                </li>
+                <li>Repeat scanning in order until you reach the shared final elephant.</li>
+                <li>The first team to scan the final duck wins, but all teams can finish at their own pace.</li>
+                <li>Keep an eye on the live leaderboard to track your progress and standings.</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True
 )
 
-# 4. “Let’s Get Started” button (centered, mobile-friendly, with hover effect)
-st.markdown(
-  """
-  <style>
-  .start-btn {
-    background-color: #FF7900;
-    color: white !important;
-    padding: 12px 25px;
-    font-size: 1.1rem;
-    border-radius: 6px;
-    text-decoration: none !important;
-    transition: background-color 0.2s ease;
-    display: inline-block;
-  }
-    .start-btn:hover, .start-btn:focus, .start-btn:active {
-      background-color: #FF9800;
-      color: white !important;
-      text-decoration: none !important;
-    }
-  </style>
-  <div style='display:flex; justify-content:center; margin:30px 0;'>
-    <a href="#start" class="start-btn">Let's Get Started</a>
-  </div>
-  """,
-  unsafe_allow_html=True
-)
 
-# 5. Simulated bottom orange banner (footer)
+# 4. Simulated bottom orange banner (footer)
 st.markdown(
   """
   <div style='width:100vw; position:fixed; left:50%; right:50%; bottom:0; margin-left:-50vw; margin-right:-50vw; background-color:#FFC591; height:48px; z-index:1000;'></div>
@@ -420,7 +421,7 @@ with col1:
 
     # LLM prototype for styling ↓
     st.markdown("---")
-    st.subheader("Guardian Chat")
+    st.subheader("💬 Guardian Chat")
 
     if "hints_used" not in st.session_state:
         st.session_state.hints_used = {}  # {station_id: int}
@@ -445,19 +446,108 @@ with col1:
             st.session_state.hints_used[station_id] = 0
             st.session_state["last_station_id"] = station_id
 
-    # Show chat history
+
+    # --- Chat Bubble CSS ---
+    st.markdown('''
+    <style>
+    .chat-row { display: flex; margin-bottom: 10px; }
+    .chat-bubble {
+        padding: 12px 18px;
+        border-radius: 18px;
+        max-width: 70%;
+        font-size: 1.08rem;
+        line-height: 1.5;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        word-break: break-word;
+    }
+    .chat-user {
+        margin-left: auto;
+        background: #ffe5b4;
+        color: #333;
+        border-bottom-right-radius: 6px;
+        border-top-right-radius: 18px;
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
+    }
+    .chat-assistant {
+        margin-right: auto;
+        background: #f3f3f3;
+        color: #222;
+        border-bottom-left-radius: 6px;
+        border-top-right-radius: 18px;
+        border-top-left-radius: 18px;
+        border-bottom-right-radius: 18px;
+    }
+    .thinking-dot {
+        display: inline-block;
+        width: 8px; height: 8px;
+        margin: 0 2px;
+        background: #bbb;
+        border-radius: 50%;
+        animation: blink 1.4s infinite both;
+    }
+    .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink {
+        0%, 80%, 100% { opacity: 0.3; }
+        40% { opacity: 1; }
+    }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    # Show chat history with bubbles
     for role, text in st.session_state.chat_history[-10:]:
         if role == "user":
-            st.write(f"**You:** {text}")
+            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-user">{text}</div></div>', unsafe_allow_html=True)
         else:
-            st.write(f"**Guardian:** {text}")
+            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-assistant">{text}</div></div>', unsafe_allow_html=True)
 
+    # Placeholders for thinking indicator and chat update
+    thinking_placeholder = st.empty()
+    # Show thinking indicator above the input box if in thinking state
+    if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
+        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
+        thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
+
+    # Clear input if requested
+    if st.session_state.get("_clear_guardian_input"):
+        st.session_state["guardian_input"] = ""
+        st.session_state["_clear_guardian_input"] = False
     user_msg = st.text_input("Ask the guardian", key="guardian_input")
+    # Custom button styling for Send and Ask for a hint
+    st.markdown('''
+    <style>
+    .stButton > button, .stButton > button:active, .stButton > button:focus, .stButton > button:hover {
+        background-color: #FF7900 !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-size: 1.08rem !important;
+        font-weight: 600 !important;
+        padding: 0.5em 1.5em !important;
+        transition: background 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .stButton > button:hover, .stButton > button:focus {
+        background: #FF9800 !important;
+        color: #fff !important;
+        border: none !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .stButton > button * {
+        color: #fff !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    </style>
+    ''', unsafe_allow_html=True)
     col_send, col_hint = st.columns(2)
     send_clicked = col_send.button("Send")
     hint_clicked = col_hint.button("Ask for a hint")
 
     if send_clicked or hint_clicked:
+        # Set flag to clear input on next rerun
+        st.session_state["_clear_guardian_input"] = True
         if not team_slug.strip():
             st.warning("Enter a team slug first.")
         elif station_id is None:
@@ -473,19 +563,54 @@ with col1:
                     give_hint = True
 
             msg = user_msg or ""
+            # Show user message immediately in chat history
             st.session_state.chat_history.append(("user", msg))
-            reply = guardian_reply(station_name, msg, seed_riddle, give_hint)
-            st.session_state.chat_history.append(("assistant", reply))
+
+            # Set state to show thinking indicator only
+            st.session_state._show_thinking = {
+                "station_name": station_name,
+                "msg": msg,
+                "seed_riddle": seed_riddle,
+                "give_hint": give_hint
+            }
             st.rerun()
 
 
+    # Step 1: Show thinking indicator if needed
+    if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
+        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
+        thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
+        # Set up for next rerun to generate reply
+        st.session_state._awaiting_guardian = st.session_state._show_thinking
+        st.session_state._show_thinking = None
+        st.stop()
+
+    # Step 2: Handle the actual LLM reply and typing animation after rerun
+    if hasattr(st.session_state, "_awaiting_guardian") and st.session_state._awaiting_guardian:
+        params = st.session_state._awaiting_guardian
+        reply = guardian_reply(params["station_name"], params["msg"], params["seed_riddle"], params["give_hint"])
+        typing_placeholder = thinking_placeholder
+        displayed = ""
+        for c in reply:
+            displayed += c
+            typing_html = f'<div class="chat-row"><div class="chat-bubble chat-assistant">{displayed}</div></div>'
+            typing_placeholder.markdown(typing_html, unsafe_allow_html=True)
+            time.sleep(0.012)
+        typing_placeholder.empty()
+        st.session_state.chat_history.append(("assistant", reply))
+        st.session_state._awaiting_guardian = None
+        st.rerun()
+
+
 with col2:
-    st.subheader("Leaderboard")
+    st.subheader("🏆 Leaderboard")
     try:
         rows = supabase.rpc("get_leaderboard").execute().data
         if rows:
+            medals = {1: '🥇', 2: '🥈', 3: '🥉'}
             for r in rows:
-                st.write(f"#{r['rank']}  {r['team_name']}: {r['points']} pts")
+                medal = medals.get(r['rank'], '')
+                st.markdown(f"{medal} #{r['rank']}  <b>{r['team_name']}</b>: <b>{r['points']} pts</b>", unsafe_allow_html=True)
         else:
             st.write("No scores yet.")
     except Exception as e:
