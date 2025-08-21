@@ -147,31 +147,7 @@ st.markdown(
 )
 
 # 4. “Let’s Get Started” button (centered, mobile-friendly, with hover effect)
-st.markdown(
-  """
-  <style>
-  .start-btn {
-    background-color: #FF7900;
-    color: white !important;
-    padding: 12px 25px;
-    font-size: 1.1rem;
-    border-radius: 6px;
-    text-decoration: none !important;
-    transition: background-color 0.2s ease;
-    display: inline-block;
-  }
-    .start-btn:hover, .start-btn:focus, .start-btn:active {
-      background-color: #FF9800;
-      color: white !important;
-      text-decoration: none !important;
-    }
-  </style>
-  <div style='display:flex; justify-content:center; margin:30px 0;'>
-    <a href="#start" class="start-btn">Let's Get Started</a>
-  </div>
-  """,
-  unsafe_allow_html=True
-)
+
 
 # 5. Simulated bottom orange banner (footer)
 st.markdown(
