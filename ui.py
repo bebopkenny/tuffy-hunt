@@ -118,30 +118,32 @@ st.markdown(
 )
 st.markdown("<h2 style='text-align:center;'>Instructions</h2>", unsafe_allow_html=True)
 st.markdown(
-    """
-    <ul style='margin: 20px auto; max-width: 600px; font-size: 1.1rem; line-height: 1.5;'>
-      <li>Read the guardian bot’s current riddle for your next station.</li>
-      <li>Discuss with your teammates and, if needed, ask the bot for one stronger hint per turn.</li>
-      <li>Tap <b>Scan</b> and scan the QR code on an elephant.</li>
-      <li>If it’s the correct elephant:
-        <ul>
-          <li>You’ll see “Nice find!”</li>
-          <li>You earn 10 points</li>
-          <li>The next riddle appears automatically</li>
-        </ul>
-      </li>
-      <li>If it’s the wrong elephant:
-        <ul>
-          <li>You’ll see “Not your elephant.”</li>
-          <li>Try again—only the next station in your sequence counts</li>
-        </ul>
-      </li>
-      <li>Repeat scanning in order until you reach the shared final elephant.</li>
-      <li>The first team to scan the final duck wins, but all teams can finish at their own pace.</li>
-      <li>Keep an eye on the live leaderboard to track your progress and standings.</li>
-    </ul>
-    """,
-    unsafe_allow_html=True
+        """
+        <div style='background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); border: 1px solid #eee; padding: 28px 32px 24px 32px; margin: 20px auto 32px auto; max-width: 650px;'>
+            <ul style='margin: 0; font-size: 1.1rem; line-height: 1.5;'>
+                <li>Read the guardian bot’s current riddle for your next station.</li>
+                <li>Discuss with your teammates and, if needed, ask the bot for one stronger hint per turn.</li>
+                <li>Tap <b>Scan</b> and scan the QR code on an elephant.</li>
+                <li>If it’s the correct elephant:
+                    <ul>
+                        <li>You’ll see “Nice find!”</li>
+                        <li>You earn 10 points</li>
+                        <li>The next riddle appears automatically</li>
+                    </ul>
+                </li>
+                <li>If it’s the wrong elephant:
+                    <ul>
+                        <li>You’ll see “Not your elephant.”</li>
+                        <li>Try again—only the next station in your sequence counts</li>
+                    </ul>
+                </li>
+                <li>Repeat scanning in order until you reach the shared final elephant.</li>
+                <li>The first team to scan the final duck wins, but all teams can finish at their own pace.</li>
+                <li>Keep an eye on the live leaderboard to track your progress and standings.</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True
 )
 
 # 4. “Let’s Get Started” button (centered, mobile-friendly, with hover effect)
