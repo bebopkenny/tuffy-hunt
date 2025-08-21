@@ -346,6 +346,10 @@ st.header("Game")
 RIDDLES = {
     "Library":   "Rows of friends with spines of ink; find the place where ideas link.",
     "Cafeteria": "Clatter and chatter at midday’s peak; hunger ends where trays you seek.",
+    "Titan REC": "",
+    "Statue of David": "",
+    "TSU Game Floor": "",
+    "CS building": "",
 }
 
 st.markdown("<hr>", unsafe_allow_html=True)
@@ -353,256 +357,258 @@ st.markdown("<hr>", unsafe_allow_html=True)
 # Left column: play area; Right column: leaderboard
 col1, col2 = st.columns([2, 1])
 
-with col1:
-    st.subheader("Team Console")
-    team_slug = st.text_input("Team slug", value="red-1234")
+# ↓ --- CONSOLE ONLY USED FOR TESTING --- ↓
+# with col1:
+#     st.subheader("Team Console")
+team_slug = st.text_input("Team slug", value="red-1234")
 
-    if team_slug.strip():
-        team, next_station, idx = get_next_station(team_slug.strip())
+#     if team_slug.strip():
+#         team, next_station, idx = get_next_station(team_slug.strip())
 
-        if not team:
-            st.error("Team not found.")
-        else:
-            st.markdown(f"**Team:** {team['name']}  \n**Step:** {0 if idx is None else idx}")
+#         if not team:
+#             st.error("Team not found.")
+#         else:
+#             st.markdown(f"**Team:** {team['name']}  \n**Step:** {0 if idx is None else idx}")
 
-            # guard: path or order may be missing
-            path = get_path(team["id"])
-            order = (path or {}).get("station_order") or []
+#             # guard: path or order may be missing
+#             path = get_path(team["id"])
+#             order = (path or {}).get("station_order") or []
 
-            if not order or idx is None or idx >= len(order):
-                st.success("Finished! 🎉")
-            else:
-                # safe to use idx now
-                expected_id = order[idx]
+#             if not order or idx is None or idx >= len(order):
+#                 st.success("Finished! 🎉")
+#             else:
+#                 # safe to use idx now
+#                 expected_id = order[idx]
 
-                # In case next_station ever comes back None
-                station_name = next_station['name'] if next_station else 'Unknown'
-                st.info(f"**Riddle:** {RIDDLES.get(station_name, 'No riddle set yet.')}")
+#                 # In case next_station ever comes back None
+#                 station_name = next_station['name'] if next_station else 'Unknown'
+#                 st.info(f"**Riddle:** {RIDDLES.get(station_name, 'No riddle set yet.')}")
 
-                # pick a wrong id if available
-                wrong_id = next((sid for sid in order if sid != expected_id), None)
+#                 # pick a wrong id if available
+#                 wrong_id = next((sid for sid in order if sid != expected_id), None)
 
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("📷 Scan (simulate correct)"):
-                        ok, msg = advance_if_expected(team_slug, expected_id)
-                        if ok:
-                            st.success(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
+#                 c1, c2 = st.columns(2)
+#                 with c1:
+#                     if st.button("📷 Scan (simulate correct)"):
+#                         ok, msg = advance_if_expected(team_slug, expected_id)
+#                         if ok:
+#                             st.success(msg)
+#                             st.rerun()
+#                         else:
+#                             st.error(msg)
 
-                with c2:
-                    if st.button("📵 Scan (simulate wrong)"):
-                        if wrong_id:
-                            ok, msg = advance_if_expected(team_slug, wrong_id)
-                            if ok:
-                                st.warning("Unexpectedly advanced with a wrong id.")
-                                st.rerun()
-                            else:
-                                st.error(msg)
-                        else:
-                            st.warning("No alternate station to simulate a wrong scan.")
+#                 with c2:
+#                     if st.button("📵 Scan (simulate wrong)"):
+#                         if wrong_id:
+#                             ok, msg = advance_if_expected(team_slug, wrong_id)
+#                             if ok:
+#                                 st.warning("Unexpectedly advanced with a wrong id.")
+#                                 st.rerun()
+#                             else:
+#                                 st.error(msg)
+#                         else:
+#                             st.warning("No alternate station to simulate a wrong scan.")
 
-            # Reset to start (dev convenience)
-            if st.button("↩️ Reset this team to start"):
-                t = get_team_by_slug(team_slug.strip())
-                if t:
-                    supabase.table("paths").update({"current_index": 0}).eq("team_id", t["id"]).execute()
-                    st.success("Reset to the first station.")
-                    st.rerun()
+#             # Reset to start (dev convenience)
+#             if st.button("↩️ Reset this team to start"):
+#                 t = get_team_by_slug(team_slug.strip())
+#                 if t:
+#                     supabase.table("paths").update({"current_index": 0}).eq("team_id", t["id"]).execute()
+#                     st.success("Reset to the first station.")
+#                     st.rerun()
 
-            # Debug panel
-            with st.expander("Debug: expected station id"):
-                if team and next_station is not None and idx is not None and idx < len(order):
-                    st.write("Expected ID:", expected_id)
-                    st.write("Station name:", next_station["name"])
-    else:
-        st.warning("Enter your team slug to begin.")
+#             # Debug panel
+#             with st.expander("Debug: expected station id"):
+#                 if team and next_station is not None and idx is not None and idx < len(order):
+#                     st.write("Expected ID:", expected_id)
+#                     st.write("Station name:", next_station["name"])
+#     else:
+#         st.warning("Enter your team slug to begin.")
+# ↑ --- CONSOLE ONLY USED FOR TESTING --- ↑
 
     # LLM prototype for styling ↓
-    st.markdown("---")
-    st.subheader("💬 Guardian Chat")
+st.markdown("---")
+st.subheader("💬 Guardian Chat")
 
-    if "hints_used" not in st.session_state:
-        st.session_state.hints_used = {}  # {station_id: int}
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []  # [(role, text)]
-    MAX_HINTS_PER_STATION = 1
+if "hints_used" not in st.session_state:
+    st.session_state.hints_used = {}  # {station_id: int}
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []  # [(role, text)]
+MAX_HINTS_PER_STATION = 1
 
-    # Current station context
-    station_id = None
-    station_name = "Unknown"
-    seed_riddle = ""
-    if team_slug.strip():
-        _team, _next_station, _idx = get_next_station(team_slug.strip())
-        if _next_station:
-            station_id = _next_station["id"]
-            station_name = _next_station.get("name", "Unknown")
-            seed_riddle = RIDDLES.get(station_name, "No riddle set yet.")
+# Current station context
+station_id = None
+station_name = "Unknown"
+seed_riddle = ""
+if team_slug.strip():
+    _team, _next_station, _idx = get_next_station(team_slug.strip())
+    if _next_station:
+        station_id = _next_station["id"]
+        station_name = _next_station.get("name", "Unknown")
+        seed_riddle = RIDDLES.get(station_name, "No riddle set yet.")
 
-    # Reset hint counter if station changed
-    if station_id is not None:
-        if st.session_state.get("last_station_id") != station_id:
-            st.session_state.hints_used[station_id] = 0
-            st.session_state["last_station_id"] = station_id
-
-
-    # --- Chat Bubble CSS ---
-    st.markdown('''
-    <style>
-    .chat-row { display: flex; margin-bottom: 10px; }
-    .chat-bubble {
-        padding: 12px 18px;
-        border-radius: 18px;
-        max-width: 70%;
-        font-size: 1.08rem;
-        line-height: 1.5;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        word-break: break-word;
-    }
-    .chat-user {
-        margin-left: auto;
-        background: #ffe5b4;
-        color: #333;
-        border-bottom-right-radius: 6px;
-        border-top-right-radius: 18px;
-        border-top-left-radius: 18px;
-        border-bottom-left-radius: 18px;
-    }
-    .chat-assistant {
-        margin-right: auto;
-        background: #f3f3f3;
-        color: #222;
-        border-bottom-left-radius: 6px;
-        border-top-right-radius: 18px;
-        border-top-left-radius: 18px;
-        border-bottom-right-radius: 18px;
-    }
-    .thinking-dot {
-        display: inline-block;
-        width: 8px; height: 8px;
-        margin: 0 2px;
-        background: #bbb;
-        border-radius: 50%;
-        animation: blink 1.4s infinite both;
-    }
-    .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
-    .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes blink {
-        0%, 80%, 100% { opacity: 0.3; }
-        40% { opacity: 1; }
-    }
-    </style>
-    ''', unsafe_allow_html=True)
-
-    # Show chat history with bubbles
-    for role, text in st.session_state.chat_history[-10:]:
-        safe = html.escape(text or "")
-        if role == "user":
-            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-user">{safe}</div></div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-assistant">{safe}</div></div>', unsafe_allow_html=True)
+# Reset hint counter if station changed
+if station_id is not None:
+    if st.session_state.get("last_station_id") != station_id:
+        st.session_state.hints_used[station_id] = 0
+        st.session_state["last_station_id"] = station_id
 
 
-    # Placeholders for thinking indicator and chat update
-    thinking_placeholder = st.empty()
-    # Show thinking indicator above the input box if in thinking state
-    if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
-        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
-        thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
+# --- Chat Bubble CSS ---
+st.markdown('''
+<style>
+.chat-row { display: flex; margin-bottom: 10px; }
+.chat-bubble {
+    padding: 12px 18px;
+    border-radius: 18px;
+    max-width: 70%;
+    font-size: 1.08rem;
+    line-height: 1.5;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    word-break: break-word;
+}
+.chat-user {
+    margin-left: auto;
+    background: #ffe5b4;
+    color: #333;
+    border-bottom-right-radius: 6px;
+    border-top-right-radius: 18px;
+    border-top-left-radius: 18px;
+    border-bottom-left-radius: 18px;
+}
+.chat-assistant {
+    margin-right: auto;
+    background: #f3f3f3;
+    color: #222;
+    border-bottom-left-radius: 6px;
+    border-top-right-radius: 18px;
+    border-top-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+}
+.thinking-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    margin: 0 2px;
+    background: #bbb;
+    border-radius: 50%;
+    animation: blink 1.4s infinite both;
+}
+.thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink {
+    0%, 80%, 100% { opacity: 0.3; }
+    40% { opacity: 1; }
+}
+</style>
+''', unsafe_allow_html=True)
 
-    # Clear input if requested
-    if st.session_state.get("_clear_guardian_input"):
-        st.session_state["guardian_input"] = ""
-        st.session_state["_clear_guardian_input"] = False
-    user_msg = st.text_input("Ask the guardian", key="guardian_input")
-    # Custom button styling for Send and Ask for a hint
-    st.markdown('''
-    <style>
-    .stButton > button, .stButton > button:active, .stButton > button:focus, .stButton > button:hover {
-        background-color: #FF7900 !important;
-        color: #fff !important;
-        border: none !important;
-        border-radius: 6px !important;
-        font-size: 1.08rem !important;
-        font-weight: 600 !important;
-        padding: 0.5em 1.5em !important;
-        transition: background 0.2s;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
-    }
-    .stButton > button:hover, .stButton > button:focus {
-        background: #FF9800 !important;
-        color: #fff !important;
-        border: none !important;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
-    }
-    .stButton > button * {
-        color: #fff !important;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
-    }
-    </style>
-    ''', unsafe_allow_html=True)
-    col_send, col_hint = st.columns(2)
-    send_clicked = col_send.button("Send")
-    hint_clicked = col_hint.button("Ask for a hint")
-
-    if send_clicked or hint_clicked:
-        # Set flag to clear input on next rerun
-        st.session_state["_clear_guardian_input"] = True
-        if not team_slug.strip():
-            st.warning("Enter a team slug first.")
-        elif station_id is None:
-            st.info("You’ve finished the hunt. Great job.")
-        else:
-            give_hint = False
-            if hint_clicked:
-                used = st.session_state.hints_used.get(station_id, 0)
-                if used >= MAX_HINTS_PER_STATION:
-                    st.info("You’ve used your hint for this station.")
-                else:
-                    st.session_state.hints_used[station_id] = used + 1
-                    give_hint = True
-
-            msg = user_msg or ""
-            # Show user message immediately in chat history
-            st.session_state.chat_history.append(("user", msg))
-
-            # Set state to show thinking indicator only
-            st.session_state._show_thinking = {
-                "station_name": station_name,
-                "msg": msg,
-                "seed_riddle": seed_riddle,
-                "give_hint": give_hint
-            }
-            st.rerun()
+# Show chat history with bubbles
+for role, text in st.session_state.chat_history[-10:]:
+    safe = html.escape(text or "")
+    if role == "user":
+        st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-user">{safe}</div></div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-assistant">{safe}</div></div>', unsafe_allow_html=True)
 
 
-    # Step 1: Show thinking indicator if needed
-    if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
-        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
-        thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
-        # Set up for next rerun to generate reply
-        st.session_state._awaiting_guardian = st.session_state._show_thinking
-        st.session_state._show_thinking = None
-        st.stop()
+# Placeholders for thinking indicator and chat update
+thinking_placeholder = st.empty()
+# Show thinking indicator above the input box if in thinking state
+if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
+    thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
+    thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
 
-    # Step 2: Handle the actual LLM reply and typing animation after rerun
-    if hasattr(st.session_state, "_awaiting_guardian") and st.session_state._awaiting_guardian:
-        params = st.session_state._awaiting_guardian
-        reply = guardian_reply(params["station_name"], params["msg"], params["seed_riddle"], params["give_hint"])
-        typing_placeholder = thinking_placeholder
-        displayed = ""
-        for c in reply:
-            displayed += c
-            typing_html = f'<div class="chat-row"><div class="chat-bubble chat-assistant">{escape(displayed)}</div></div>'
-            typing_placeholder.markdown(typing_html, unsafe_allow_html=True)
-            time.sleep(0.012)
-        typing_placeholder.empty()
-        st.session_state.chat_history.append(("assistant", reply))
-        st.session_state._awaiting_guardian = None
+# Clear input if requested
+if st.session_state.get("_clear_guardian_input"):
+    st.session_state["guardian_input"] = ""
+    st.session_state["_clear_guardian_input"] = False
+user_msg = st.text_input("Ask the guardian", key="guardian_input")
+# Custom button styling for Send and Ask for a hint
+st.markdown('''
+<style>
+.stButton > button, .stButton > button:active, .stButton > button:focus, .stButton > button:hover {
+    background-color: #FF7900 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 1.08rem !important;
+    font-weight: 600 !important;
+    padding: 0.5em 1.5em !important;
+    transition: background 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.stButton > button:hover, .stButton > button:focus {
+    background: #FF9800 !important;
+    color: #fff !important;
+    border: none !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.stButton > button * {
+    color: #fff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+</style>
+''', unsafe_allow_html=True)
+col_send, col_hint = st.columns(2)
+send_clicked = col_send.button("Send")
+hint_clicked = col_hint.button("Ask for a hint")
+
+if send_clicked or hint_clicked:
+    # Set flag to clear input on next rerun
+    st.session_state["_clear_guardian_input"] = True
+    if not team_slug.strip():
+        st.warning("Enter a team slug first.")
+    elif station_id is None:
+        st.info("You’ve finished the hunt. Great job.")
+    else:
+        give_hint = False
+        if hint_clicked:
+            used = st.session_state.hints_used.get(station_id, 0)
+            if used >= MAX_HINTS_PER_STATION:
+                st.info("You’ve used your hint for this station.")
+            else:
+                st.session_state.hints_used[station_id] = used + 1
+                give_hint = True
+
+        msg = user_msg or ""
+        # Show user message immediately in chat history
+        st.session_state.chat_history.append(("user", msg))
+
+        # Set state to show thinking indicator only
+        st.session_state._show_thinking = {
+            "station_name": station_name,
+            "msg": msg,
+            "seed_riddle": seed_riddle,
+            "give_hint": give_hint
+        }
         st.rerun()
+
+
+# Step 1: Show thinking indicator if needed
+if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
+    thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
+    thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
+    # Set up for next rerun to generate reply
+    st.session_state._awaiting_guardian = st.session_state._show_thinking
+    st.session_state._show_thinking = None
+    st.stop()
+
+# Step 2: Handle the actual LLM reply and typing animation after rerun
+if hasattr(st.session_state, "_awaiting_guardian") and st.session_state._awaiting_guardian:
+    params = st.session_state._awaiting_guardian
+    reply = guardian_reply(params["station_name"], params["msg"], params["seed_riddle"], params["give_hint"])
+    typing_placeholder = thinking_placeholder
+    displayed = ""
+    for c in reply:
+        displayed += c
+        typing_html = f'<div class="chat-row"><div class="chat-bubble chat-assistant">{escape(displayed)}</div></div>'
+        typing_placeholder.markdown(typing_html, unsafe_allow_html=True)
+        time.sleep(0.012)
+    typing_placeholder.empty()
+    st.session_state.chat_history.append(("assistant", reply))
+    st.session_state._awaiting_guardian = None
+    st.rerun()
 
 
 with col2:
