@@ -5,7 +5,8 @@ from typing import Optional, Tuple
 import random
 from llm import ask_grok, guardian_reply
 import time
-
+import html
+from html import escape
 
 # 1. Page config
 st.set_page_config(page_title="Tuffy Hunt", layout="wide")
@@ -163,7 +164,7 @@ st.markdown(
                     </ul>
                 </li>
                 <li>Repeat scanning in order until you reach the shared final elephant.</li>
-                <li>The first team to scan the final duck wins, but all teams can finish at their own pace.</li>
+                <li>The first team to scan the final elephant wins, but all teams can finish at their own pace.</li>
                 <li>Keep an eye on the live leaderboard to track your progress and standings.</li>
             </ul>
         </div>
@@ -497,10 +498,12 @@ with col1:
 
     # Show chat history with bubbles
     for role, text in st.session_state.chat_history[-10:]:
+        safe = html.escape(text or "")
         if role == "user":
-            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-user">{text}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-user">{safe}</div></div>', unsafe_allow_html=True)
         else:
-            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-assistant">{text}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-assistant">{safe}</div></div>', unsafe_allow_html=True)
+
 
     # Placeholders for thinking indicator and chat update
     thinking_placeholder = st.empty()
@@ -593,7 +596,7 @@ with col1:
         displayed = ""
         for c in reply:
             displayed += c
-            typing_html = f'<div class="chat-row"><div class="chat-bubble chat-assistant">{displayed}</div></div>'
+            typing_html = f'<div class="chat-row"><div class="chat-bubble chat-assistant">{escape(displayed)}</div></div>'
             typing_placeholder.markdown(typing_html, unsafe_allow_html=True)
             time.sleep(0.012)
         typing_placeholder.empty()
