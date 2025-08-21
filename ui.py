@@ -9,7 +9,7 @@ from llm import ask_grok, guardian_reply
 # 1. Page config
 st.set_page_config(page_title="Tuffy Hunt", layout="wide")
 
-# Override Streamlit's primary color to orange
+# Override Streamlit's primary color to orange and hide 'Press Enter to apply'
 st.markdown('''
 <style>
 :root {
@@ -21,6 +21,13 @@ st.markdown('''
 .st-bb, .st-cb, .st-eb, .st-em, .stTextInput > div > div > input:focus, .stTextInput > div > div > input:active {
     border-color: #FF7900 !important;
     box-shadow: 0 0 0 2px #FF790022 !important;
+}
+/* Hide 'Press Enter to apply' helper text for all Streamlit text inputs */
+div[data-testid="stTextInput"] span:has(svg) + div span,
+div[data-testid="stTextInput"] > div > div > span,
+div[data-testid="stTextInput"] label + div span,
+div[data-testid="stTextInput"] > div > span {
+    display: none !important;
 }
 </style>
 ''', unsafe_allow_html=True)
