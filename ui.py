@@ -447,17 +447,79 @@ with col1:
             st.session_state.hints_used[station_id] = 0
             st.session_state["last_station_id"] = station_id
 
-    # Show chat history
+
+    # --- Chat Bubble CSS ---
+    st.markdown('''
+    <style>
+    .chat-row { display: flex; margin-bottom: 10px; }
+    .chat-bubble {
+        padding: 12px 18px;
+        border-radius: 18px;
+        max-width: 70%;
+        font-size: 1.08rem;
+        line-height: 1.5;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        word-break: break-word;
+    }
+    .chat-user {
+        margin-left: auto;
+        background: #ffe5b4;
+        color: #333;
+        border-bottom-right-radius: 6px;
+        border-top-right-radius: 18px;
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
+    }
+    .chat-assistant {
+        margin-right: auto;
+        background: #f3f3f3;
+        color: #222;
+        border-bottom-left-radius: 6px;
+        border-top-right-radius: 18px;
+        border-top-left-radius: 18px;
+        border-bottom-right-radius: 18px;
+    }
+    .thinking-dot {
+        display: inline-block;
+        width: 8px; height: 8px;
+        margin: 0 2px;
+        background: #bbb;
+        border-radius: 50%;
+        animation: blink 1.4s infinite both;
+    }
+    .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink {
+        0%, 80%, 100% { opacity: 0.3; }
+        40% { opacity: 1; }
+    }
+    </style>
+    ''', unsafe_allow_html=True)
+
+    # Show chat history with bubbles
     for role, text in st.session_state.chat_history[-10:]:
         if role == "user":
-            st.write(f"**You:** {text}")
+            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-user">{text}</div></div>', unsafe_allow_html=True)
         else:
-            st.write(f"**Guardian:** {text}")
+            st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-assistant">{text}</div></div>', unsafe_allow_html=True)
+
+
+
+    # Placeholders for thinking indicator and chat update
+    thinking_placeholder = st.empty()
+    # Show thinking indicator above the input box if in thinking state
+    if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
+        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant">Thinking <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
+        thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
 
     user_msg = st.text_input("Ask the guardian", key="guardian_input")
     col_send, col_hint = st.columns(2)
     send_clicked = col_send.button("Send")
     hint_clicked = col_hint.button("Ask for a hint")
+
+
+    import time
+
 
     if send_clicked or hint_clicked:
         if not team_slug.strip():
@@ -475,10 +537,43 @@ with col1:
                     give_hint = True
 
             msg = user_msg or ""
+            # Show user message immediately in chat history
             st.session_state.chat_history.append(("user", msg))
-            reply = guardian_reply(station_name, msg, seed_riddle, give_hint)
-            st.session_state.chat_history.append(("assistant", reply))
+
+            # Set state to show thinking indicator only
+            st.session_state._show_thinking = {
+                "station_name": station_name,
+                "msg": msg,
+                "seed_riddle": seed_riddle,
+                "give_hint": give_hint
+            }
             st.rerun()
+
+
+    # Step 1: Show thinking indicator if needed
+    if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
+        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant">Thinking <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
+        thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
+        # Set up for next rerun to generate reply
+        st.session_state._awaiting_guardian = st.session_state._show_thinking
+        st.session_state._show_thinking = None
+        st.stop()
+
+    # Step 2: Handle the actual LLM reply and typing animation after rerun
+    if hasattr(st.session_state, "_awaiting_guardian") and st.session_state._awaiting_guardian:
+        params = st.session_state._awaiting_guardian
+        reply = guardian_reply(params["station_name"], params["msg"], params["seed_riddle"], params["give_hint"])
+        typing_placeholder = thinking_placeholder
+        displayed = ""
+        for c in reply:
+            displayed += c
+            typing_html = f'<div class="chat-row"><div class="chat-bubble chat-assistant">{displayed}</div></div>'
+            typing_placeholder.markdown(typing_html, unsafe_allow_html=True)
+            time.sleep(0.012)
+        typing_placeholder.empty()
+        st.session_state.chat_history.append(("assistant", reply))
+        st.session_state._awaiting_guardian = None
+        st.rerun()
 
 
 with col2:
