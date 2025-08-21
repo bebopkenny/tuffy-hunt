@@ -1,0 +1,3 @@
+team_slug,team_name,station_id,station_name,file_name,url
+red-1234,"Team Red",e96d2104-0c34-45b6-88fc-3f075d55f349,"Library",01_Library_e96d2104.png,http://localhost:8501/?team=red-1234&station=e96d2104-0c34-45b6-88fc-3f075d55f349&scan=1
+red-1234,"Team Red",6e681c03-1914-4945-bc1d-f3f6de81387e,"Cafeteria",02_Cafeteria_6e681c03.png,http://localhost:8501/?team=red-1234&station=6e681c03-1914-4945-bc1d-f3f6de81387e&scan=1

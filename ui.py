@@ -3,6 +3,8 @@ import base64
 from db import supabase
 from typing import Optional, Tuple
 import random
+from llm import ask_grok
+
 
 # 1. Page config
 st.set_page_config(page_title="Tuffy Hunt", layout="wide")
@@ -429,3 +431,15 @@ with col2:
             st.write("No scores yet.")
     except Exception as e:
         st.error(f"Could not load leaderboard. {e}")
+
+    # manual refresh button
+    if st.button("↻ Refresh leaderboard"):
+        st.rerun()
+
+
+# Example test
+if st.button("Ask Grok something"):
+    reply = ask_grok("Give me a fun elephant fact")
+    st.write(reply)
+
+
