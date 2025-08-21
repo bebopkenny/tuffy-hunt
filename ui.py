@@ -421,7 +421,7 @@ with col1:
 
     # LLM prototype for styling ↓
     st.markdown("---")
-    st.subheader("Guardian Chat")
+    st.subheader("💬 Guardian Chat")
 
     if "hints_used" not in st.session_state:
         st.session_state.hints_used = {}  # {station_id: int}
@@ -609,7 +609,7 @@ with col1:
 
 
 with col2:
-    st.subheader("Leaderboard")
+    st.subheader("🏆 Leaderboard")
     try:
         rows = supabase.rpc("get_leaderboard").execute().data
         if rows:
