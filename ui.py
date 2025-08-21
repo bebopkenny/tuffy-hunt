@@ -9,6 +9,22 @@ from llm import ask_grok, guardian_reply
 # 1. Page config
 st.set_page_config(page_title="Tuffy Hunt", layout="wide")
 
+# Override Streamlit's primary color to orange
+st.markdown('''
+<style>
+:root {
+    --primary-color: #FF7900 !important;
+    --primary: #FF7900 !important;
+    --accent: #FF7900 !important;
+    --secondary-background-color: #ffe5b4 !important;
+}
+.st-bb, .st-cb, .st-eb, .st-em, .stTextInput > div > div > input:focus, .stTextInput > div > div > input:active {
+    border-color: #FF7900 !important;
+    box-shadow: 0 0 0 2px #FF790022 !important;
+}
+</style>
+''', unsafe_allow_html=True)
+
 # If realtime event landed return quickly to refresh the leaderboard
 if st.session_state.get("_lb_bump") is not None:
     st.session_state["_lb_bump"] = None
