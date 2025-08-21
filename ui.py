@@ -407,8 +407,6 @@ with col1:
                 t = get_team_by_slug(team_slug.strip())
                 if t:
                     supabase.table("paths").update({"current_index": 0}).eq("team_id", t["id"]).execute()
-                    # During development only, you may also clear winner:
-                    # supabase.table("teams").update({"won_at": None}).eq("id", t["id"]).execute()
                     st.success("Reset to the first station.")
                     st.rerun()
 
@@ -419,6 +417,67 @@ with col1:
                     st.write("Station name:", next_station["name"])
     else:
         st.warning("Enter your team slug to begin.")
+
+    # LLM prototype for styling ↓
+    st.markdown("---")
+    st.subheader("Guardian Chat")
+
+    if "hints_used" not in st.session_state:
+        st.session_state.hints_used = {}  # {station_id: int}
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []  # [(role, text)]
+    MAX_HINTS_PER_STATION = 1
+
+    # Current station context
+    station_id = None
+    station_name = "Unknown"
+    seed_riddle = ""
+    if team_slug.strip():
+        _team, _next_station, _idx = get_next_station(team_slug.strip())
+        if _next_station:
+            station_id = _next_station["id"]
+            station_name = _next_station.get("name", "Unknown")
+            seed_riddle = RIDDLES.get(station_name, "No riddle set yet.")
+
+    # Reset hint counter if station changed
+    if station_id is not None:
+        if st.session_state.get("last_station_id") != station_id:
+            st.session_state.hints_used[station_id] = 0
+            st.session_state["last_station_id"] = station_id
+
+    # Show chat history
+    for role, text in st.session_state.chat_history[-10:]:
+        if role == "user":
+            st.write(f"**You:** {text}")
+        else:
+            st.write(f"**Guardian:** {text}")
+
+    user_msg = st.text_input("Ask the guardian", key="guardian_input")
+    col_send, col_hint = st.columns(2)
+    send_clicked = col_send.button("Send")
+    hint_clicked = col_hint.button("Ask for a hint")
+
+    if send_clicked or hint_clicked:
+        if not team_slug.strip():
+            st.warning("Enter a team slug first.")
+        elif station_id is None:
+            st.info("You’ve finished the hunt. Great job.")
+        else:
+            give_hint = False
+            if hint_clicked:
+                used = st.session_state.hints_used.get(station_id, 0)
+                if used >= MAX_HINTS_PER_STATION:
+                    st.info("You’ve used your hint for this station.")
+                else:
+                    st.session_state.hints_used[station_id] = used + 1
+                    give_hint = True
+
+            msg = user_msg or ""
+            st.session_state.chat_history.append(("user", msg))
+            reply = guardian_reply(station_name, msg, seed_riddle, give_hint)
+            st.session_state.chat_history.append(("assistant", reply))
+            st.rerun()
+
 
 with col2:
     st.subheader("Leaderboard")
@@ -435,11 +494,3 @@ with col2:
     # manual refresh button
     if st.button("↻ Refresh leaderboard"):
         st.rerun()
-
-
-# Example test
-if st.button("Ask Grok something"):
-    reply = ask_grok("Give me a fun elephant fact")
-    st.write(reply)
-
-

@@ -3,16 +3,15 @@ from __future__ import annotations
 import os
 from typing import List, Dict, Any
 
-# OpenAI-compatible SDK (works with xAI/Grok)
 from openai import OpenAI
 
-# ── secrets loader: Streamlit first, fall back to reading .streamlit/secrets.toml ──
+# secrets loader -> streamlit first, fall back to reading .streamlit/secrets.toml
 def _load_secrets():
     api_key = None
     base_url = "https://api.x.ai/v1"
     model = "grok-4"
 
-    # Try Streamlit secrets (when running streamlit)
+    # try streamlit secrets when running streamlit
     try:
         import streamlit as st  # type: ignore
         api_key = st.secrets["GROK_API_KEY"]
@@ -22,7 +21,7 @@ def _load_secrets():
     except Exception:
         pass
 
-    # Fallback: parse .streamlit/secrets.toml directly (when running python llm.py)
+    # fallback parse .streamlit/secrets.toml 
     try:
         import tomllib  # py>=3.11
         with open(".streamlit/secrets.toml", "rb") as f:
@@ -43,9 +42,9 @@ def _load_secrets():
 _API_KEY, _BASE_URL, MODEL = _load_secrets()
 client = OpenAI(api_key=_API_KEY, base_url=_BASE_URL)
 
-# ── minimal direct ask helper ──
+# minimal direct ask helper
 def ask_grok(prompt: str, max_tokens: int = 300) -> str:
-    """Send a single-turn prompt to Grok and return text."""
+    """Send a single turn prompt to Grok and return text."""
     try:
         resp = client.chat.completions.create(
             model=MODEL,
@@ -56,7 +55,7 @@ def ask_grok(prompt: str, max_tokens: int = 300) -> str:
     except Exception as e:
         return f"[Error contacting Grok: {e}]"
 
-# ── conversation-style helper ──
+# conversation-style helper
 def call_grok(messages: List[Dict[str, Any]], max_tokens: int = 250) -> str:
     """Call Grok with an OpenAI-format messages array."""
     resp = client.chat.completions.create(
@@ -66,7 +65,7 @@ def call_grok(messages: List[Dict[str, Any]], max_tokens: int = 250) -> str:
     )
     return resp.choices[0].message.content.strip()
 
-# ── Guardian policy & wrapper ──
+# guardian rules
 SYSTEM_RULES = (
     "You are the Tuffy Hunt Guardian for a campus scavenger hunt. "
     "Speak in short riddles and small hints. One hint per station per turn. "
@@ -105,9 +104,9 @@ def guardian_reply(
             ]
         return call_grok(messages)
     except Exception:
-        # Never break the UI: fall back gracefully
+        # ui fall back gracefully
         return seed_riddle if not give_hint else "Try a quieter corner nearby and think literally."
 
-# ── optional: run this file standalone to sanity-check your key ──
+# run this standalone to sanity check your key
 if __name__ == "__main__":
     print(ask_grok("Hello Grok, test from Tuffy Hunt!"))
