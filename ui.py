@@ -485,9 +485,13 @@ with col1:
     thinking_placeholder = st.empty()
     # Show thinking indicator above the input box if in thinking state
     if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
-        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant">Thinking <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
+        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
         thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
 
+    # Clear input if requested
+    if st.session_state.get("_clear_guardian_input"):
+        st.session_state["guardian_input"] = ""
+        st.session_state["_clear_guardian_input"] = False
     user_msg = st.text_input("Ask the guardian", key="guardian_input")
     col_send, col_hint = st.columns(2)
     send_clicked = col_send.button("Send")
@@ -498,6 +502,8 @@ with col1:
 
 
     if send_clicked or hint_clicked:
+        # Set flag to clear input on next rerun
+        st.session_state["_clear_guardian_input"] = True
         if not team_slug.strip():
             st.warning("Enter a team slug first.")
         elif station_id is None:
@@ -528,7 +534,7 @@ with col1:
 
     # Step 1: Show thinking indicator if needed
     if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinking:
-        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant">Thinking <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
+        thinking_html = '<div class="chat-row"><div class="chat-bubble chat-assistant"><span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span></div></div>'
         thinking_placeholder.markdown(thinking_html, unsafe_allow_html=True)
         # Set up for next rerun to generate reply
         st.session_state._awaiting_guardian = st.session_state._show_thinking
