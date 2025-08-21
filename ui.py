@@ -3,7 +3,7 @@ import base64
 from db import supabase
 from typing import Optional, Tuple
 import random
-from llm import ask_grok
+from llm import ask_grok, guardian_reply
 
 
 # 1. Page config
@@ -279,21 +279,22 @@ def advance_if_expected(team_slug: str, scanned_station_id: str) -> Tuple[bool, 
 
 
 # supabase realtime channel
-if "lb_channel" not in st.session_state:
-    def _on_score_insert(payload):
-        # bump a session var so Streamlit reruns on next tick
-        st.session_state["_lb_bump"] = random.random()
+# realtime is not working will work on this later
+# if "lb_channel" not in st.session_state:
+#     def _on_score_insert(payload):
+#         # bump a session var so Streamlit reruns on next tick
+#         st.session_state["_lb_bump"] = random.random()
 
-    st.session_state["lb_channel"] = (
-        supabase
-        .channel("scores_live")
-        .on("postgres_changes",
-            event="INSERT",
-            schema="public",
-            table="score_events",
-            callback=_on_score_insert)
-        .subscribe()
-    )
+#     st.session_state["lb_channel"] = (
+#         supabase
+#         .channel("scores_live")
+#         .on("postgres_changes",
+#             event="INSERT",
+#             schema="public",
+#             table="score_events",
+#             callback=_on_score_insert)
+#         .subscribe()
+#     )
 
 # Handle scan links in the game
 
@@ -347,7 +348,6 @@ RIDDLES = {
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# Left column: play area; Right column: leaderboard
 # Left column: play area; Right column: leaderboard
 col1, col2 = st.columns([2, 1])
 
