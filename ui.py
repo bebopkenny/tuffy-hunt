@@ -493,6 +493,33 @@ with col1:
         st.session_state["guardian_input"] = ""
         st.session_state["_clear_guardian_input"] = False
     user_msg = st.text_input("Ask the guardian", key="guardian_input")
+    # Custom button styling for Send and Ask for a hint
+    st.markdown('''
+    <style>
+    .stButton > button, .stButton > button:active, .stButton > button:focus, .stButton > button:hover {
+        background-color: #FF7900 !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-size: 1.08rem !important;
+        font-weight: 600 !important;
+        padding: 0.5em 1.5em !important;
+        transition: background 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .stButton > button:hover, .stButton > button:focus {
+        background: #FF9800 !important;
+        color: #fff !important;
+        border: none !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .stButton > button * {
+        color: #fff !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    </style>
+    ''', unsafe_allow_html=True)
     col_send, col_hint = st.columns(2)
     send_clicked = col_send.button("Send")
     hint_clicked = col_hint.button("Ask for a hint")
