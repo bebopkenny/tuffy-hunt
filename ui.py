@@ -4,6 +4,7 @@ from db import supabase
 from typing import Optional, Tuple
 import random
 from llm import ask_grok, guardian_reply
+import time
 
 
 # 1. Page config
@@ -129,6 +130,7 @@ st.markdown(f"""
 <div class="banner-spacer"></div>
 """, unsafe_allow_html=True)
 
+
 # 3. Main content (responsive)
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
@@ -169,10 +171,8 @@ st.markdown(
         unsafe_allow_html=True
 )
 
-# 4. “Let’s Get Started” button (centered, mobile-friendly, with hover effect)
 
-
-# 5. Simulated bottom orange banner (footer)
+# 4. Simulated bottom orange banner (footer)
 st.markdown(
   """
   <div style='width:100vw; position:fixed; left:50%; right:50%; bottom:0; margin-left:-50vw; margin-right:-50vw; background-color:#FFC591; height:48px; z-index:1000;'></div>
@@ -502,8 +502,6 @@ with col1:
         else:
             st.markdown(f'<div class="chat-row"><div class="chat-bubble chat-assistant">{text}</div></div>', unsafe_allow_html=True)
 
-
-
     # Placeholders for thinking indicator and chat update
     thinking_placeholder = st.empty()
     # Show thinking indicator above the input box if in thinking state
@@ -546,10 +544,6 @@ with col1:
     col_send, col_hint = st.columns(2)
     send_clicked = col_send.button("Send")
     hint_clicked = col_hint.button("Ask for a hint")
-
-
-    import time
-
 
     if send_clicked or hint_clicked:
         # Set flag to clear input on next rerun
