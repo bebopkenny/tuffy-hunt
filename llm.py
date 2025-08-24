@@ -1,6 +1,8 @@
 import streamlit as st
 from openai import OpenAI
 from datetime import date
+import re 
+from typing import List, Optional
 
 # client and model
 client = OpenAI(
@@ -15,6 +17,34 @@ TEMPERATURE = float(st.secrets.get("TEMPERATURE", 0.3))
 
 DEFAULT_DAILY_REQUESTS = int(st.secrets.get("DAILY_REQUEST_LIMIT", 300))
 DEFAULT_DAILY_COMPLETION_TOKENS = int(st.secrets.get("DAILY_COMPLETION_TOKEN_LIMIT", 60000))
+
+def _truncate_to_sentences(text: str, max_sentences: int = 3) -> str:
+    if not text:
+        return ""
+    # split but keep punctuation
+    parts = re.split(r'([.!?])', text)
+    out, count = [], 0
+    for i in range(0, len(parts), 2):
+        seg = parts[i].strip()
+        punct = parts[i+1] if i+1 < len(parts) else ""
+        if not seg:
+            continue
+        out.append(seg + punct)
+        count += 1
+        if count >= max_sentences:
+            break
+    return " ".join(out).strip()
+
+def _scrub_forbidden(text: str, tokens: List[str]) -> str:
+    if not text:
+        return ""
+    out = text
+    for t in tokens:
+        if not t:
+            continue
+        out = re.sub(re.escape(t), "[redacted]", out, flags=re.IGNORECASE)
+    return out
+
 
 def _get_budget():
     today = date.today().isoformat()
@@ -90,23 +120,30 @@ def ask_grok(prompt: str) -> str:
         return f"[Error: {e}]"
 
 # LLM reply
-def guardian_reply(station_name: str, user_msg: str, seed_riddle: str, give_hint: bool) -> str:
+def guardian_reply(
+    station_name: str,
+    user_msg: str,
+    seed_riddle: str,
+    give_hint: bool,
+    forbidden_aliases: Optional[List[str]] = None
+) -> str:
     intent = "hint" if give_hint else "chat"
 
     payload = (
         "SCENE: You are guiding a team in a campus scavenger hunt via riddles.\n"
         f"STATION_NAME (secret, do NOT reveal): {station_name or 'Unknown'}\n"
         f"SEED_RIDDLE: {seed_riddle or '(none)'}\n"
-        f"INTENT: {intent}\n"
+        f"HINT_MODE: {str(give_hint)}\n"
         f"USER_SAID: {(user_msg or '').strip()}\n"
-        "TASK: Respond as The Guardian. Start from the seed riddle context. "
-        "Only give a stronger hint if INTENT is 'hint'. Keep it to 1–3 sentences."
+        "TASK: Respond as The Guardian. Start from the SEED_RIDDLE. "
+        "If HINT_MODE is true, provide exactly ONE stronger hint than your normal reply. "
+        "Keep to 1–3 short sentences. Plain text only."
     )
 
     try:
         _check_budget_or_raise()
         resp = client.chat.completions.create(
-            model=MODEL,  # "grok-4"
+            model=MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": payload},
@@ -119,7 +156,15 @@ def guardian_reply(station_name: str, user_msg: str, seed_riddle: str, give_hint
         text = (resp.choices[0].message.content or "").strip()
         if not text:
             return "Hmm… I didn’t quite catch that. Try asking again."
-        return _enforce_secrecy(text, station_name)
+
+        # 1) enforce 1–3 sentences
+        text = _truncate_to_sentences(text, 3)
+
+        # 2) scrub exact name and aliases
+        forbid = [station_name] + (forbidden_aliases or [])
+        text = _scrub_forbidden(text, forbid)
+
+        return text
 
     except Exception:
         return "The guardian had a hiccup. Please try again."

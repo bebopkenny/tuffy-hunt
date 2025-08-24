@@ -3,10 +3,11 @@ import base64
 from db import supabase
 from typing import Optional, Tuple
 import random
-from llm import ask_grok, guardian_reply
+from llm import guardian_reply
 import time
 import html
 from html import escape
+from riddles import RIDDLES
 
 # 1. Page config
 st.set_page_config(page_title="Tuffy Hunt", layout="wide")
@@ -342,15 +343,20 @@ def handle_scan_from_query():
 handle_scan_from_query()
 st.header("Game")
 
+def get_seed_and_aliases(station_id: str):
+    info = RIDDLES.get(station_id)
+    if not info:
+        return ("A small friend waits nearby. Look for the spot that fits your team’s story.", [])
+    return (info["seed"], info.get("aliases", []))
 
-RIDDLES = {
-    "Library":   "Rows of friends with spines of ink; find the place where ideas link.",
-    "Cafeteria": "Clatter and chatter at midday’s peak; hunger ends where trays you seek.",
-    "Titan REC": "",
-    "Statue of David": "",
-    "TSU Game Floor": "",
-    "CS building": "",
-}
+# RIDDLES = {
+#     "Library":   "Rows of friends with spines of ink; find the place where ideas link.",
+#     "Cafeteria": "Clatter and chatter at midday’s peak; hunger ends where trays you seek.",
+#     "Titan REC": "",
+#     "Statue of David": "",
+#     "TSU Game Floor": "",
+#     "CS building": "",
+# }
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
@@ -361,6 +367,18 @@ col1, col2 = st.columns([2, 1])
 # with col1:
 #     st.subheader("Team Console")
 team_slug = st.text_input("Team slug", value="red-1234")
+team_slug_str = team_slug.strip()
+# guard against no team slug before rendering the chat
+if not team_slug_str:
+    st.info("Enter a team slug to start your hunt.")
+
+
+# Reset chat + hint state if the team changes
+if st.session_state.get("last_team_slug") != team_slug_str:
+    st.session_state["last_team_slug"] = team_slug_str
+    st.session_state.chat_history = []
+    st.session_state.hints_used = {}
+    st.session_state["last_station_id"] = None   # <- add this
 
 #     if team_slug.strip():
 #         team, next_station, idx = get_next_station(team_slug.strip())
@@ -437,15 +455,21 @@ if "chat_history" not in st.session_state:
 MAX_HINTS_PER_STATION = 1
 
 # Current station context
+if "guardian_busy" not in st.session_state:
+    st.session_state.guardian_busy = False
+
 station_id = None
 station_name = "Unknown"
 seed_riddle = ""
-if team_slug.strip():
-    _team, _next_station, _idx = get_next_station(team_slug.strip())
+aliases = []
+
+team_slug_str = team_slug.strip()
+if team_slug_str:
+    _team, _next_station, _idx = get_next_station(team_slug_str)
     if _next_station:
         station_id = _next_station["id"]
         station_name = _next_station.get("name", "Unknown")
-        seed_riddle = RIDDLES.get(station_name, "No riddle set yet.")
+        seed_riddle, aliases = get_seed_and_aliases(station_id)
 
 # Reset hint counter if station changed
 if station_id is not None:
@@ -522,7 +546,7 @@ if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinki
 if st.session_state.get("_clear_guardian_input"):
     st.session_state["guardian_input"] = ""
     st.session_state["_clear_guardian_input"] = False
-user_msg = st.text_input("Ask the guardian", key="guardian_input")
+user_msg = st.text_input("Ask the guardian", key="guardian_input", disabled=st.session_state.guardian_busy)
 # Custom button styling for Send and Ask for a hint
 st.markdown('''
 <style>
@@ -551,36 +575,44 @@ st.markdown('''
 </style>
 ''', unsafe_allow_html=True)
 col_send, col_hint = st.columns(2)
-send_clicked = col_send.button("Send")
-hint_clicked = col_hint.button("Ask for a hint")
+send_clicked = col_send.button("Send", disabled=st.session_state.guardian_busy)
+hint_clicked = col_hint.button("Ask for a hint", disabled=st.session_state.guardian_busy)
 
 if send_clicked or hint_clicked:
-    # Set flag to clear input on next rerun
+    if st.session_state.guardian_busy:
+        st.stop()
+    st.session_state.guardian_busy = True
     st.session_state["_clear_guardian_input"] = True
-    if not team_slug.strip():
+
+    if not team_slug_str:
         st.warning("Enter a team slug first.")
+        st.session_state.guardian_busy = False
     elif station_id is None:
         st.info("You’ve finished the hunt. Great job.")
+        st.session_state.guardian_busy = False
     else:
         give_hint = False
         if hint_clicked:
             used = st.session_state.hints_used.get(station_id, 0)
             if used >= MAX_HINTS_PER_STATION:
                 st.info("You’ve used your hint for this station.")
+                st.session_state.guardian_busy = False
+                st.stop()
             else:
                 st.session_state.hints_used[station_id] = used + 1
                 give_hint = True
 
         msg = user_msg or ""
-        # Show user message immediately in chat history
         st.session_state.chat_history.append(("user", msg))
 
-        # Set state to show thinking indicator only
+        # Save everything the LLM call needs
         st.session_state._show_thinking = {
+            "station_id": station_id,
             "station_name": station_name,
             "msg": msg,
             "seed_riddle": seed_riddle,
-            "give_hint": give_hint
+            "aliases": aliases,
+            "give_hint": give_hint,
         }
         st.rerun()
 
@@ -597,7 +629,22 @@ if hasattr(st.session_state, "_show_thinking") and st.session_state._show_thinki
 # Step 2: Handle the actual LLM reply and typing animation after rerun
 if hasattr(st.session_state, "_awaiting_guardian") and st.session_state._awaiting_guardian:
     params = st.session_state._awaiting_guardian
-    reply = guardian_reply(params["station_name"], params["msg"], params["seed_riddle"], params["give_hint"])
+
+    # Use what we saved pre-click
+    station_name = params["station_name"]
+    user_text = params["msg"]
+    seed_riddle = params["seed_riddle"]
+    aliases = params.get("aliases", [])
+    give_hint = params["give_hint"]
+
+    reply = guardian_reply(
+        station_name=station_name,
+        user_msg=user_text,
+        seed_riddle=seed_riddle,
+        give_hint=give_hint,
+        forbidden_aliases=aliases,
+    )
+
     typing_placeholder = thinking_placeholder
     displayed = ""
     for c in reply:
@@ -605,8 +652,10 @@ if hasattr(st.session_state, "_awaiting_guardian") and st.session_state._awaitin
         typing_html = f'<div class="chat-row"><div class="chat-bubble chat-assistant">{escape(displayed)}</div></div>'
         typing_placeholder.markdown(typing_html, unsafe_allow_html=True)
         time.sleep(0.012)
+
     typing_placeholder.empty()
     st.session_state.chat_history.append(("assistant", reply))
+    st.session_state.guardian_busy = False
     st.session_state._awaiting_guardian = None
     st.rerun()
 
