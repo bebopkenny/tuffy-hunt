@@ -29,7 +29,7 @@ The first team to reach the final elephant wins, but all teams can complete the 
   - Live leaderboard view
 
 ## Architecture
-![Architecture](https://sdmntpreastus.oaiusercontent.com/files/00000000-d85c-61f9-9b29-a743e5b3617c/raw?se=2025-08-27T01%3A05%3A33Z&sp=r&sv=2024-08-04&sr=b&scid=58b86b10-1ab5-5a41-a6ee-7b7305c304c9&skoid=31bc9c1a-c7e0-460a-8671-bf4a3c419305&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-08-26T21%3A56%3A58Z&ske=2025-08-27T21%3A56%3A58Z&sks=b&skv=2024-08-04&sig=WGm9xV9Ywxjg25wZnNgdWbK1ot0f2xNG2Dzu2uDaoOE%3D)
+![Architecture](https://media.discordapp.net/attachments/1299155448959598595/1415746119173935224/Web_Application_Flowchart_with_Grok_and_Supabase.png?ex=68c453d2&is=68c30252&hm=6baf2a388a9c417be18b65343257450a0beab2e50ddfd9bf9a5712d0141b54e3&=&format=webp&quality=lossless&width=1920&height=1280)
 - Frontend  
   Built in Streamlit. Handles chat UI, team input, QR scan handling, and leaderboard rendering.  
 
